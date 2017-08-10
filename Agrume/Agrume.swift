@@ -170,6 +170,14 @@ public final class Agrume: UIViewController {
       let view = UIView(frame: self.view.frame)
       view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
       view.backgroundColor = backgroundColor ?? .clear
+      
+      let closeButton = UIButton(frame: CGRect(x: 16, y: 16, width: 25, height: 25))
+      closeButton.setImage(#imageLiteral(resourceName: "Cancel"), for: .normal)
+      closeButton.tintColor = .white
+      closeButton.isUserInteractionEnabled = false
+      closeButton.imageEdgeInsets = UIEdgeInsetsMake(4, 4, 4, 4)
+      view.addSubview(closeButton)
+      
       _blurContainerView = view
     }
     return _blurContainerView!

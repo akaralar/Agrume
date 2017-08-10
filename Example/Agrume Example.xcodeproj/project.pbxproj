@@ -221,6 +221,7 @@
 				TargetAttributes = {
 					F2A520141B130C7E00924912 = {
 						CreatedOnToolsVersion = 6.3.2;
+						DevelopmentTeam = 9Z7C58VJXB;
 						LastSwiftMigration = 0800;
 					};
 					F2A520291B130C7E00924912 = {
@@ -443,6 +444,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = 9Z7C58VJXB;
 				INFOPLIST_FILE = "Agrume Example/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.schnaub.$(PRODUCT_NAME:rfc1034identifier)";
@@ -455,6 +457,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = 9Z7C58VJXB;
 				INFOPLIST_FILE = "Agrume Example/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.schnaub.$(PRODUCT_NAME:rfc1034identifier)";
