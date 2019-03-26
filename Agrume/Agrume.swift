@@ -144,7 +144,7 @@ public final class Agrume: UIViewController {
       closeButton.setImage(#imageLiteral(resourceName: "Cancel"), for: .normal)
       closeButton.tintColor = .white
       closeButton.isUserInteractionEnabled = false
-      closeButton.imageEdgeInsets = UIEdgeInsetsMake(4, 4, 4, 4)
+      closeButton.imageEdgeInsets = UIEdgeInsets(top: 4, left: 4, bottom: 4, right: 4)
       view.addSubview(closeButton)
       
       _blurContainerView = view
