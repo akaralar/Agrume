@@ -3,8 +3,9 @@
 //
 
 import UIKit
+import SwiftyGif
 
-protocol AgrumeCellDelegate: class {
+protocol AgrumeCellDelegate: AnyObject {
   
   func dismissAfterFlick()
   func dismissAfterTap()
@@ -14,12 +15,12 @@ protocol AgrumeCellDelegate: class {
 
 final class AgrumeCell: UICollectionViewCell {
 
-  fileprivate static let targetZoomForDoubleTap: CGFloat = 3
-  fileprivate static let minFlickDismissalVelocity: CGFloat = 800
-  fileprivate static let highScrollVelocity: CGFloat = 1600
+  var tapBehavior: Agrume.TapBehavior = .dismissIfZoomedOut
+  var hasPhysics = true
 
-  fileprivate lazy var scrollView: UIScrollView = {
-    let scrollView = UIScrollView(frame: self.contentView.bounds)
+  private lazy var scrollView: UIScrollView = {
+    let scrollView = UIScrollView(frame: contentView.bounds)
+    scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     scrollView.delegate = self
     scrollView.zoomScale = 1
     scrollView.maximumZoomScale = 8
@@ -28,19 +29,23 @@ final class AgrumeCell: UICollectionViewCell {
     scrollView.showsVerticalScrollIndicator = false
     return scrollView
   }()
-  fileprivate lazy var imageView: UIImageView = {
-    let imageView = UIImageView(frame: self.contentView.bounds)
+  private lazy var imageView: UIImageView = {
+    let imageView = UIImageView(frame: contentView.bounds)
     imageView.contentMode = .scaleAspectFit
     imageView.isUserInteractionEnabled = true
     imageView.clipsToBounds = true
     imageView.layer.allowsEdgeAntialiasing = true
     return imageView
   }()
-  fileprivate var animator: UIDynamicAnimator!
+  private var animator: UIDynamicAnimator?
 
   var image: UIImage? {
     didSet {
-      imageView.image = image
+      if image?.imageData != nil, let image = image {
+        imageView.setGifImage(image)
+      } else {
+        imageView.image = image
+      }
       updateScrollViewAndImageViewForCurrentMetrics()
     }
   }
@@ -49,11 +54,13 @@ final class AgrumeCell: UICollectionViewCell {
   override init(frame: CGRect) {
     super.init(frame: frame)
 
-    backgroundColor = UIColor.clear
+    backgroundColor = .clear
     contentView.addSubview(scrollView)
     scrollView.addSubview(imageView)
     setupGestureRecognizers()
-    animator = UIDynamicAnimator(referenceView: scrollView)
+    if hasPhysics {
+      animator = UIDynamicAnimator(referenceView: scrollView)
+    }
   }
 
   required init?(coder aDecoder: NSCoder) {
@@ -61,23 +68,24 @@ final class AgrumeCell: UICollectionViewCell {
   }
 
   override func prepareForReuse() {
+    super.prepareForReuse()
     imageView.image = nil
     scrollView.zoomScale = 1
     updateScrollViewAndImageViewForCurrentMetrics()
   }
 
-  fileprivate lazy var singleTapGesture: UITapGestureRecognizer = {
+  private lazy var singleTapGesture: UITapGestureRecognizer = {
     let singleTapGesture = UITapGestureRecognizer(target: self, action: #selector(singleTap))
-    singleTapGesture.require(toFail: self.doubleTapGesture)
+    singleTapGesture.require(toFail: doubleTapGesture)
     singleTapGesture.delegate = self
     return singleTapGesture
   }()
-  fileprivate lazy var doubleTapGesture: UITapGestureRecognizer = {
+  private lazy var doubleTapGesture: UITapGestureRecognizer = {
     let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(doubleTap))
     doubleTapGesture.numberOfTapsRequired = 2
     return doubleTapGesture
   }()
-  fileprivate lazy var panGesture: UIPanGestureRecognizer = {
+  private lazy var panGesture: UIPanGestureRecognizer = {
     let panGesture = UIPanGestureRecognizer(target: self, action: #selector(dismissPan))
     panGesture.maximumNumberOfTouches = 1
     panGesture.delegate = self
@@ -90,18 +98,22 @@ final class AgrumeCell: UICollectionViewCell {
     return swipeGesture
   }()
 
-  fileprivate var flickedToDismiss = false
-  fileprivate var isDraggingImage = false
-  fileprivate var imageDragStartingPoint: CGPoint!
-  fileprivate var imageDragOffsetFromActualTranslation: UIOffset!
-  fileprivate var imageDragOffsetFromImageCenter: UIOffset!
-  fileprivate var attachmentBehavior: UIAttachmentBehavior?
+  private var flickedToDismiss = false
+  private var isDraggingImage = false
+  private var imageDragStartingPoint: CGPoint!
+  private var imageDragOffsetFromActualTranslation: UIOffset!
+  private var imageDragOffsetFromImageCenter: UIOffset!
+  private var attachmentBehavior: UIAttachmentBehavior?
 
-  fileprivate func setupGestureRecognizers() {
+  private func setupGestureRecognizers() {
     contentView.addGestureRecognizer(singleTapGesture)
     contentView.addGestureRecognizer(doubleTapGesture)
     scrollView.addGestureRecognizer(panGesture)
     contentView.addGestureRecognizer(swipeGesture)
+  }
+
+  func cleanup() {
+    animator = nil
   }
 
 }
@@ -121,8 +133,6 @@ extension AgrumeCell: UIGestureRecognizerDelegate {
       return abs(velocity.y) > abs(velocity.x)
     } else if let _ = gestureRecognizer as? UISwipeGestureRecognizer, notZoomed() {
       return false
-    } else if let tap = gestureRecognizer as? UITapGestureRecognizer, tap == singleTapGesture && !notZoomed() {
-      return false
     }
     return true
   }
@@ -134,11 +144,12 @@ extension AgrumeCell: UIGestureRecognizerDelegate {
     return true
   }
 
-  @objc fileprivate func doubleTap(_ sender: UITapGestureRecognizer) {
+  @objc
+  private func doubleTap(_ sender: UITapGestureRecognizer) {
     let point = scrollView.convert(sender.location(in: sender.view), from: sender.view)
     
     if notZoomed() {
-      zoom(to: point, scale: AgrumeCell.targetZoomForDoubleTap)
+      zoom(to: point, scale: .targetZoomForDoubleTap)
     } else {
       zoom(to: .zero, scale: 1)
     }
@@ -151,7 +162,7 @@ extension AgrumeCell: UIGestureRecognizerDelegate {
 
     let width = scrollView.frame.width / scale
     let height = scrollView.frame.height / scale
-    let destination = CGRect(x: translatedZoom.x - width  / 2, y: translatedZoom.y - height / 2, width: width, height: height)
+    let destination = CGRect(x: translatedZoom.x - width / 2, y: translatedZoom.y - height / 2, width: width, height: height)
 
     contentView.isUserInteractionEnabled = false
     
@@ -163,7 +174,7 @@ extension AgrumeCell: UIGestureRecognizerDelegate {
     CATransaction.commit()
   }
 
-  fileprivate func contentInsetForScrollView(atScale: CGFloat) -> UIEdgeInsets {
+  private func contentInsetForScrollView(atScale: CGFloat) -> UIEdgeInsets {
     let boundsWidth = scrollView.bounds.width
     let boundsHeight = scrollView.bounds.height
     let contentWidth = max(image?.size.width ?? 0, boundsWidth)
@@ -201,11 +212,25 @@ extension AgrumeCell: UIGestureRecognizerDelegate {
     }
   }
 
-  @objc fileprivate func singleTap(_ gesture: UITapGestureRecognizer) {
-    dismiss()
+  @objc
+  private func singleTap() {
+    switch tapBehavior {
+    case .dismissIfZoomedOut:
+      if notZoomed() {
+        dismiss()
+      }
+    case .dismissAlways:
+      dismiss()
+    case .zoomOut:
+      if notZoomed() {
+        dismiss()
+      } else {
+        zoom(to: .zero, scale: 1)
+      }
+    }
   }
 
-  fileprivate func dismiss() {
+  private func dismiss() {
     if flickedToDismiss {
       delegate?.dismissAfterFlick()
     } else {
@@ -213,7 +238,11 @@ extension AgrumeCell: UIGestureRecognizerDelegate {
     }
   }
 
-  @objc fileprivate func dismissPan(_ gesture: UIPanGestureRecognizer) {
+  @objc
+  private func dismissPan(_ gesture: UIPanGestureRecognizer) {
+    if !hasPhysics {
+      return
+    }
     let translation = gesture.translation(in: gesture.view!)
     let locationInView = gesture.location(in: gesture.view)
     let velocity = gesture.velocity(in: gesture.view)
@@ -238,7 +267,7 @@ extension AgrumeCell: UIGestureRecognizerDelegate {
         }
       }
     } else {
-      if vectorDistance > AgrumeCell.minFlickDismissalVelocity {
+      if vectorDistance > .minFlickDismissalVelocity {
         if isDraggingImage {
           dismissWithFlick(velocity)
         } else {
@@ -250,33 +279,35 @@ extension AgrumeCell: UIGestureRecognizerDelegate {
     }
   }
 
-  fileprivate func dismissWithFlick(_ velocity: CGPoint) {
+  private func dismissWithFlick(_ velocity: CGPoint) {
     flickedToDismiss = true
 
     let push = UIPushBehavior(items: [imageView], mode: .instantaneous)
     push.pushDirection = CGVector(dx: velocity.x * 0.1, dy: velocity.y * 0.1)
     push.setTargetOffsetFromCenter(imageDragOffsetFromImageCenter, for: imageView)
     push.action = pushAction
-    animator.removeBehavior(attachmentBehavior!)
-    animator.addBehavior(push)
+    if let attachmentBehavior = attachmentBehavior {
+      animator?.removeBehavior(attachmentBehavior)
+    }
+    animator?.addBehavior(push)
   }
   
-  fileprivate func pushAction() {
+  private func pushAction() {
     if isImageViewOffscreen() {
-      animator.removeAllBehaviors()
+      animator?.removeAllBehaviors()
       attachmentBehavior = nil
       imageView.removeFromSuperview()
       dismiss()
     }
   }
 
-  fileprivate func isImageViewOffscreen() -> Bool {
+  private func isImageViewOffscreen() -> Bool {
     let visibleRect = scrollView.convert(contentView.bounds, from: contentView)
-    return animator.items(in: visibleRect).count == 0
+    return animator?.items(in: visibleRect).count == 0
   }
 
-  fileprivate func cancelCurrentImageDrag(_ animated: Bool) {
-    animator.removeAllBehaviors()
+  private func cancelCurrentImageDrag(_ animated: Bool) {
+    animator?.removeAllBehaviors()
     attachmentBehavior = nil
     isDraggingImage = false
 
@@ -289,36 +320,39 @@ extension AgrumeCell: UIGestureRecognizerDelegate {
                      usingSpringWithDamping: 0.7,
                      initialSpringVelocity: 0,
                      options: [.allowUserInteraction, .beginFromCurrentState],
-                     animations: { [unowned self] in
+                     animations: {
                       guard !self.isDraggingImage else { return }
                       
                       self.imageView.transform = CGAffineTransform.identity
                       if !self.scrollView.isDragging && !self.scrollView.isDecelerating {
-                        self.imageView.center = CGPoint(x: self.scrollView.contentSize.width / 2,
-                                                        y: self.scrollView.contentSize.height / 2)
+                        self.recenterImage(size: self.scrollView.contentSize)
                         self.updateScrollViewAndImageViewForCurrentMetrics()
                       }
-        }, completion: nil)
+        })
       }
   }
+  
+  func recenterImage(size: CGSize) {
+    imageView.center = CGPoint(x: size.width / 2, y: size.height / 2)
+  }
 
-  func updateScrollViewAndImageViewForCurrentMetrics() {
-    scrollView.frame = contentView.bounds
+  private func updateScrollViewAndImageViewForCurrentMetrics() {
+    scrollView.frame = contentView.frame
     if let image = imageView.image {
-      imageView.frame = resizedFrameForSize(image.size)
+      imageView.frame = resizedFrame(forSize: image.size)
     }
     scrollView.contentSize = imageView.frame.size
     scrollView.contentInset = contentInsetForScrollView(atScale: scrollView.zoomScale)
   }
 
-  fileprivate func resizedFrameForSize(_ imageSize: CGSize) -> CGRect {
-    var frame = contentView.bounds
+  private func resizedFrame(forSize size: CGSize) -> CGRect {
+    var frame = contentView.frame
     let screenWidth = frame.width * scrollView.zoomScale
     let screenHeight = frame.height * scrollView.zoomScale
     var targetWidth = screenWidth
     var targetHeight = screenHeight
-    let nativeWidth = max(imageSize.width, screenWidth)
-    let nativeHeight = max(imageSize.height, screenHeight)
+    let nativeWidth = max(size.width, screenWidth)
+    let nativeHeight = max(size.height, screenHeight)
 
     if nativeHeight > nativeWidth {
       if screenHeight / screenWidth < nativeHeight / nativeWidth {
@@ -339,7 +373,7 @@ extension AgrumeCell: UIGestureRecognizerDelegate {
     return frame
   }
 
-  fileprivate func startImageDragging(_ locationInView: CGPoint, translationOffset: UIOffset) {
+  private func startImageDragging(_ locationInView: CGPoint, translationOffset: UIOffset) {
     imageDragStartingPoint = locationInView
     imageDragOffsetFromActualTranslation = translationOffset
 
@@ -347,33 +381,36 @@ extension AgrumeCell: UIGestureRecognizerDelegate {
     let imageCenter = imageView.center
     let offset = UIOffset(horizontal: locationInView.x - imageCenter.x, vertical: locationInView.y - imageCenter.y)
     imageDragOffsetFromImageCenter = offset
-    attachmentBehavior = UIAttachmentBehavior(item: imageView, offsetFromCenter: offset, attachedToAnchor: anchor!)
-    animator.addBehavior(attachmentBehavior!)
 
-    let modifier = UIDynamicItemBehavior(items: [imageView])
-    modifier.angularResistance = angularResistance(in: imageView)
-    modifier.density = density(in: imageView)
-    animator.addBehavior(modifier)
+    if hasPhysics {
+      attachmentBehavior = UIAttachmentBehavior(item: imageView, offsetFromCenter: offset, attachedToAnchor: anchor!)
+      animator!.addBehavior(attachmentBehavior!)
+      
+      let modifier = UIDynamicItemBehavior(items: [imageView])
+      modifier.angularResistance = angularResistance(in: imageView)
+      modifier.density = density(in: imageView)
+      animator!.addBehavior(modifier)
+    }
   }
 
-  fileprivate func angularResistance(in view: UIView) -> CGFloat {
+  private func angularResistance(in view: UIView) -> CGFloat {
     let defaultResistance: CGFloat = 4
     return appropriateValue(defaultValue: defaultResistance) * factor(forView: view)
   }
 
-  fileprivate func density(in view: UIView) -> CGFloat {
+  private func density(in view: UIView) -> CGFloat {
     let defaultDensity: CGFloat = 0.5
     return appropriateValue(defaultValue: defaultDensity) * factor(forView: view)
   }
 
-  fileprivate func appropriateValue(defaultValue: CGFloat) -> CGFloat {
+  private func appropriateValue(defaultValue: CGFloat) -> CGFloat {
     let screenWidth = UIScreen.main.bounds.width
     let screenHeight = UIScreen.main.bounds.height
     // Default value that works well for the screenSize adjusted for the actual size of the device
     return defaultValue * ((320 * 480) / (screenWidth * screenHeight))
   }
 
-  fileprivate func factor(forView view: UIView) -> CGFloat {
+  private func factor(forView view: UIView) -> CGFloat {
     let actualArea = contentView.bounds.height * view.bounds.height
     let referenceArea = contentView.bounds.height * contentView.bounds.width
     return referenceArea / actualArea
@@ -401,11 +438,10 @@ extension AgrumeCell: UIScrollViewDelegate {
   }
 
   func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-    let highVelocity = AgrumeCell.highScrollVelocity
+    let highVelocity: CGFloat = .highScrollVelocity
     let velocity = scrollView.panGestureRecognizer.velocity(in: scrollView.panGestureRecognizer.view)
-    if notZoomed() && (fabs(velocity.x) > highVelocity || fabs(velocity.y) > highVelocity) {
+    if notZoomed() && (abs(velocity.x) > highVelocity || abs(velocity.y) > highVelocity) {
       dismiss()
     }
   }
-
 }

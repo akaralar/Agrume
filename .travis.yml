@@ -1,9 +1,6 @@
 language: objective-c
-osx_image: xcode8.2
-before_install:
-  - gem install fastlane --no-doc
+osx_image: xcode10
 script:
-  - echo $SIMULATOR_ID
-  - open -b com.apple.iphonesimulator --args -CurrentDeviceUDID $SIMULATOR_ID
-  - fastlane scan
-  # - pod lib lint
+  - git submodule init
+  - bundle exec danger
+  

@@ -7,15 +7,12 @@ import Agrume
 
 final class SingleImageViewController: UIViewController {
   
-  var agrume: Agrume!
-  
-  override func viewDidLoad() {
-    super.viewDidLoad()
-    agrume = Agrume(image: UIImage(named: "MapleBacon")!)
-  }
+  private lazy var agrume: Agrume = {
+    return Agrume(image: #imageLiteral(resourceName: "MapleBacon"), background: .blurred(.regular))
+  }()
 
-  @IBAction func openImage(_ sender: AnyObject) {
-    agrume.showFrom(self)
+  @IBAction private func openImage(_ sender: Any) {
+    agrume.show(from: self)
   }
 
 }
